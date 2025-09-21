@@ -1,4 +1,4 @@
-# Mindscape V3
+# Mindscape
 
 A comprehensive mental health platform designed specifically for students to track their wellness journey, access self-assessments, and book counseling sessions with mental health professionals.
 
@@ -26,12 +26,10 @@ A comprehensive mental health platform designed specifically for students to tra
 
 ### Backend
 - **Node.js/Express** (Assessment API & User Management)
-- **Django** (Booking System)
 - **MongoDB** (Assessment data storage)
 - **JWT Authentication**
 
 ### DevOps
-- **Docker** (Optional containerization)
 - **Git** for version control
 
 ## 📋 Prerequisites
@@ -57,17 +55,7 @@ A comprehensive mental health platform designed specifically for students to tra
    npm run dev
    ```
 
-3. **Backend Setup (Django)**
-   ```bash
-   cd backend
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   pip install -r requirements.txt
-   python manage.py migrate
-   python manage.py runserver
-   ```
-
-4. **Frontend Setup**
+3. **Frontend Setup**
    ```bash
    cd frontend
    npm install
@@ -87,12 +75,6 @@ JWT_SECRET=your_jwt_secret_here
 PORT=5000
 ```
 
-**backend/.env**
-```
-SECRET_KEY=your_django_secret_key
-DATABASE_URL=sqlite:///db.sqlite3
-```
-
 **frontend/.env.local**
 ```
 NEXT_PUBLIC_API_BASE=http://localhost:5000/api
@@ -100,7 +82,7 @@ NEXT_PUBLIC_API_BASE=http://localhost:5000/api
 
 ## 📖 Usage
 
-1. **Start all services** (Node.js backend, Django backend, and frontend)
+1. **Start all services** (Node.js backend and frontend)
 2. **Access the application** at `http://localhost:3000`
 3. **Register/Login** to create your account
 4. **Complete your profile** with personal information
@@ -125,10 +107,6 @@ mindscape-v3/
 │   ├── routes/              # API routes
 │   ├── middleware/          # Custom middleware
 │   └── app.js               # Express app setup
-├── backend/                 # Django backend
-│   ├── apps/                # Django apps
-│   ├── settings.py          # Django settings
-│   └── urls.py              # URL routing
 ├── .gitignore               # Git ignore rules
 └── README.md               # Project documentation
 ```
@@ -155,7 +133,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 If you encounter any issues or have questions:
 
-1. Check the [Issues](https://github.com/yourusername/mindscape-v3/issues) page
+1. Check the [Issues](https://github.com/shouryakakkar/Mindscape/issues) page
 2. Create a new issue with detailed information
 3. Contact the maintainers
 
