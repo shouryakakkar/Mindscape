@@ -12,7 +12,7 @@ A comprehensive mental health platform designed specifically for students to tra
 - **Wellness Score Calculation**: Automated composite wellness score based on assessment results
 - **Counseling Session Booking**: Schedule appointments with mental health professionals
 - **Progress Tracking**: Monitor mental health journey over time
-- **Multi-language Support**: English, Spanish, and Hindi
+- **Multi-language Support**: English
 - **Responsive Design**: Optimized for desktop and mobile devices
 
 ## 🛠 Tech Stack
