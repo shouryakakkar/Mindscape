@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -58,14 +58,11 @@ function computeSum(values: number[]) {
   return values.reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0);
 }
 
-function computeComposite(depr: number, anx: number, stress: number) {
-  // Normalize each to 0-100 and average for a composite wellness score
-  const d = (depr / 30) * 100;
-  const a = (anx / 30) * 100;
-  const s = (stress / 30) * 100;
-  // higher=better by inverting symptom scores
-  const inverted = [100 - d, 100 - a, 100 - s];
-  return Math.round(inverted.reduce((x, y) => x + y, 0) / 3);
+function computeCompositeFlexible(totals: number[]) {
+  // Accept 1 to 3 totals (each 0-30), normalize to 0-100, invert (higher is better), average
+  const parts = totals.map(t => 100 - (t / 30) * 100);
+  const denom = parts.length || 1;
+  return Math.round(parts.reduce((x, y) => x + y, 0) / denom);
 }
 
 type Mode = "menu" | "depression" | "anxiety" | "stress";
@@ -80,11 +77,13 @@ export default function AssessmentsPage() {
   const [idx, setIdx] = useState(0);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<{ dep: number; anx: number; stress: number; wellness: number } | null>(null);
+  const [shouldAnimate, setShouldAnimate] = useState(false);
 
-  const allAnswered = useMemo(
-    () => depAnswers.every(v => v >= 0) && anxAnswers.every(v => v >= 0) && strAnswers.every(v => v >= 0),
-    [depAnswers, anxAnswers, strAnswers]
-  );
+  const depComplete = useMemo(() => depAnswers.every(v => v >= 0), [depAnswers]);
+  const anxComplete = useMemo(() => anxAnswers.every(v => v >= 0), [anxAnswers]);
+  const strComplete = useMemo(() => strAnswers.every(v => v >= 0), [strAnswers]);
+  const allAnswered = depComplete && anxComplete && strComplete;
+  const atLeastOneComplete = depComplete || anxComplete || strComplete;
 
   const current = useMemo(() => {
     if (mode === "depression") return { questions: depressionQs, answers: depAnswers, setAnswers: setDepAnswers };
@@ -100,6 +99,7 @@ export default function AssessmentsPage() {
     if (m === "depression") setIdx(depAnswers.findIndex(v => v < 0) === -1 ? 0 : depAnswers.findIndex(v => v < 0));
     if (m === "anxiety") setIdx(anxAnswers.findIndex(v => v < 0) === -1 ? 0 : anxAnswers.findIndex(v => v < 0));
     if (m === "stress") setIdx(strAnswers.findIndex(v => v < 0) === -1 ? 0 : strAnswers.findIndex(v => v < 0));
+    setShouldAnimate(false); // starting test should not animate yet
   };
 
   const answerCurrent = (val: number) => {
@@ -107,16 +107,26 @@ export default function AssessmentsPage() {
     const next = [...current.answers];
     next[idx] = val;
     current.setAnswers(next);
+    // Do NOT animate just for answer change
+    setShouldAnimate(false);
   };
 
   const submitAll = async () => {
-    if (!allAnswered) return;
-    const dep = computeSum(depAnswers);
-    const anx = computeSum(anxAnswers);
-    const stress = computeSum(strAnswers);
-    const wellness = computeComposite(dep, anx, stress);
+    // Allow submission if at least one test is completed
+    if (!atLeastOneComplete) return;
+    const dep = depComplete ? computeSum(depAnswers) : 0;
+    const anx = anxComplete ? computeSum(anxAnswers) : 0;
+    const stress = strComplete ? computeSum(strAnswers) : 0;
+
+    const totals: number[] = [];
+    if (depComplete) totals.push(dep);
+    if (anxComplete) totals.push(anx);
+    if (strComplete) totals.push(stress);
+
+    const wellness = computeCompositeFlexible(totals);
     setSaving(true);
     try {
+      // Backend requires numbers for all fields; send zeros for incomplete tests
       const res = await fetchWithAuth(`${API_BASE}/api/assessments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -127,11 +137,15 @@ export default function AssessmentsPage() {
           wellnessScore: wellness,
         })
       });
-      if (!res.ok) throw new Error('Failed to save assessment');
 
+      // Show result regardless of save success to satisfy UX requirement
+      if (!res.ok) {
+        console.warn('Save failed but showing local result.');
+      }
       setResult({ dep, anx, stress, wellness });
     } catch (e) {
       console.error(e);
+      setResult({ dep, anx, stress, wellness });
     } finally {
       setSaving(false);
     }
@@ -144,7 +158,7 @@ export default function AssessmentsPage() {
     const last = idx === current.questions.length - 1;
 
     return (
-      <Card key={idx} className="glass-card animate-fade-up">
+      <Card key={idx} className={shouldAnimate ? "glass-card animate-fade-up" : "glass-card"}>
         <CardHeader>
           <CardTitle className="text-center">
             {mode === 'depression' && 'Depression Screening'}
@@ -164,7 +178,7 @@ export default function AssessmentsPage() {
             <p className="text-center text-muted-foreground">Measure your perceived stress levels • 10 questions</p>
           )}
           <div className="text-sm text-muted-foreground text-center">Question {idx + 1}/10</div>
-          <div className="max-w-xl mx-auto"><Progress value={Math.round(((idx + (answered ? 1 : 0)) / current.questions.length) * 100)} className="h-2" /></div>
+          <div className="max-w-xl mx-auto"><Progress value={Math.round(((idx + 0) / current.questions.length) * 100)} className="h-2" /></div>
           <div className="text-lg md:text-xl font-semibold text-center">{q}</div>
 
           {/* Vertical options with radio buttons */}
@@ -187,7 +201,7 @@ export default function AssessmentsPage() {
           <div className="flex justify-between pt-2">
             <Button
               variant="outline"
-              onClick={() => setIdx((v) => Math.max(0, v - 1))}
+              onClick={() => { setShouldAnimate(true); setIdx((v) => Math.max(0, v - 1)); }}
               disabled={idx === 0}
               className="rounded-xl"
             >
@@ -195,7 +209,7 @@ export default function AssessmentsPage() {
             </Button>
             {!last ? (
               <Button
-                onClick={() => setIdx((v) => Math.min(current.questions.length - 1, v + 1))}
+                onClick={() => { setShouldAnimate(true); setIdx((v) => Math.min(current.questions.length - 1, v + 1)); }}
                 disabled={!answered}
                 className="rounded-xl transition-transform active:scale-95"
               >
@@ -203,7 +217,7 @@ export default function AssessmentsPage() {
               </Button>
             ) : (
               <Button
-                onClick={() => setMode('menu')}
+                onClick={() => { setShouldAnimate(true); setMode('menu'); }}
                 disabled={!answered}
                 className="rounded-xl"
               >
@@ -268,7 +282,7 @@ export default function AssessmentsPage() {
       <div className="flex items-center justify-between">
         {!result ? (
           <div className="flex items-center gap-3">
-            <Button disabled={!allAnswered || saving} onClick={submitAll} className="rounded-xl">
+            <Button disabled={!atLeastOneComplete || saving} onClick={submitAll} className="rounded-xl">
               {saving ? 'Saving...' : 'Calculate Wellness Score'}
             </Button>
             <Button
@@ -289,12 +303,12 @@ export default function AssessmentsPage() {
         ) : (
           <div className="space-y-3 w-full">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="text-lg">Depression score: <Badge>{result.dep}/30</Badge></div>
-              <div className="text-lg">Anxiety score: <Badge>{result.anx}/30</Badge></div>
-              <div className="text-lg">Stress score: <Badge>{result.stress}/30</Badge></div>
+              <div className="text-lg">Depression score: <Badge>{depComplete ? `${result.dep}/30` : '—'}</Badge></div>
+              <div className="text-lg">Anxiety score: <Badge>{anxComplete ? `${result.anx}/30` : '—'}</Badge></div>
+              <div className="text-lg">Stress score: <Badge>{strComplete ? `${result.stress}/30` : '—'}</Badge></div>
             </div>
             <div className="text-center text-2xl md:text-3xl font-extrabold">
-              Wellness score: <span className="text-primary">{result.wellness}</span>
+              Wellness score: <span className="text-primary">{result.wellness}/100</span>
             </div>
             <div className="text-center">
               <Button
